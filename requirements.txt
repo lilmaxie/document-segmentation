@@ -1,0 +1,18 @@
+# Core
+numpy>=1.23
+opencv-python>=4.8
+Pillow>=9.5
+streamlit>=1.36
+
+# Data & augmentation
+albumentations>=1.3
+scikit-learn>=1.3
+
+# Google image downloader
+google_images_download
+
+# Optional (chỉ dùng nếu bạn thực sự dùng argparse hoặc multiprocessing bên ngoài notebook)
+argparse  # có thể comment nếu không cần (trường hợp nếu chỉ dùng script chạy từ CLI)
+
+# core AI framework
+# torch==2.5.1+cu121
