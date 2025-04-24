@@ -13,12 +13,20 @@ import torchvision.transforms as T
 import torchvision.transforms.functional as F
 
 
+"""
+Hàm này tạo ra một kích thước ngẫu nhiên cho ảnh đầu vào.
+Kích thước này được tính bằng cách nhân chiều cao và chiều rộng của ảnh với một hệ số ngẫu nhiên trong khoảng từ 1.1 đến 1.4.
+Hệ số này được tạo ra bằng cách sử dụng hàm uniform từ thư viện random.
+"""
 def get_random_size(doc_height, doc_width, factor=None):
     size_factor = uniform(factor[0], factor[1])
     new_h, new_w = int(size_factor * doc_height), int(size_factor * doc_width)
     return new_h, new_w
 
-
+"""
+Hàm này tạo ra một crop ngẫu nhiên cho ảnh đầu vào.
+Crop này được tạo ra bằng cách chọn một vị trí ngẫu nhiên trong ảnh và lấy một phần của ảnh với chiều cao và chiều rộng đã cho.
+"""
 def get_random_crop(image, crop_height, crop_width):
     max_x = image.shape[1] - crop_width + 1
     max_y = image.shape[0] - crop_height + 1
@@ -30,7 +38,9 @@ def get_random_crop(image, crop_height, crop_width):
 
     return ymin, xmin, ymax, xmax
 
-
+"""
+Hàm này là để ghép nối ảnh tài liệu với ảnh nền đã được crop.
+"""
 def create(cropped_bck_img=None, doc_img=None, doc_msk=None):
     doc_img = doc_img / 255.0
     mask_inv = np.where(doc_msk == 255, 0.0, 1.0)
@@ -135,6 +145,16 @@ def operation(params=None):
     contrast = A.RandomBrightnessContrast(contrast_limit=(0.1, 0.34), p=0.5)
     contrast_2 = A.RandomBrightnessContrast(p=0.5)
 
+    """
+    Augmentation pipeline:
+    - Đảo ngược chiều dọc hoặc chiều ngang với xác suất 0.8
+    - Xoay ảnh với xác suất 0.5
+    - Thay đổi màu sắc với xác suất 0.7
+    - Trộn kênh màu với xác suất 0.6
+    - Tăng độ tương phản với xác suất 0.5
+    - Áp dụng một trong các biến thể quang học, biến dạng lưới hoặc biến dạng đàn hồi với xác suất 0.8
+    Kết quả: ~6 ảnh nền × n giấy tờ × N góc → hàng chục nghìn cặp {image, mask} đa dạng, giảm overfit
+    """
     augs = A.Compose(
         [
             A.OneOf([v_flip, h_flip], p=0.8),
@@ -162,6 +182,9 @@ def operation(params=None):
         W, H = orig_img.size
 
         # ========================================================
+        """
+        Giả lập góc chụp xiên bằng RandomPerspective
+        """
         perspective_imgs, perspective_msks = generate_perspective_transformed_image(
             transformer=perspective_transformer,
             distortion_scale=distortion_scale,

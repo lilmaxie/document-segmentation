@@ -24,14 +24,6 @@ from torchvision.models.segmentation import (
 
 @st.cache_resource(show_spinner="🔄 Đang tải model …")
 def load_model(num_classes: int = 2, model_name: str = "mbv3", device: torch.device | None = None):
-    """Tải và cache model segmentation.
-    Args:
-        num_classes: số lớp output.
-        model_name: "mbv3" hoặc "r50".
-        device: thiết bị PyTorch. Nếu None sẽ tự động chọn CUDA nếu khả dụng.
-    Returns:
-        Model đã đặt ở eval mode trên đúng device.
-    """
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -58,7 +50,9 @@ def image_preprocess_transforms(mean=(0.4611, 0.4359, 0.3905), std=(0.2193, 0.21
         [torchvision_T.ToTensor(), torchvision_T.Normalize(mean, std)]
     )
 
-
+"""
+Dựa trên tổng và hiệu tọa độ - chuẩn hóa thứ tự để các hàm sau không lẫn góc
+"""
 def order_points(pts):
     """Sắp xếp lại 4 điểm theo thứ tự TL, TR, BR, BL"""
     rect = np.zeros((4, 2), dtype="float32")
@@ -71,7 +65,9 @@ def order_points(pts):
     rect[3] = pts[np.argmax(diff)]
     return rect.astype(int).tolist()
 
-
+"""
+Sinh 4 điểm cho transform, đảm bảo ảnh ra có kích thước tối đa nhưng vẫn tỉ lệ
+"""
 def find_dest(pts):
     (tl, tr, br, bl) = pts
     widthA = np.linalg.norm(np.array(br) - np.array(bl))
@@ -82,7 +78,9 @@ def find_dest(pts):
     maxH = int(max(heightA, heightB))
     return order_points([[0, 0], [maxW, 0], [maxW, maxH], [0, maxH]])
 
-
+"""
+Thuật toán scan lúc inference
+"""
 def scan(image_true: np.ndarray, trained_model: torch.nn.Module, image_size: int = 384, BUFFER: int = 10):
     global preprocess_transforms
 
@@ -99,7 +97,7 @@ def scan(image_true: np.ndarray, trained_model: torch.nn.Module, image_size: int
     image_model = preprocess_transforms(image_model)
     image_model = torch.unsqueeze(image_model, 0)
 
-    # 👉 đảm bảo input tensor cùng device với model
+    # đảm bảo input tensor cùng device với model
     device = next(trained_model.parameters()).device
     image_model = image_model.to(device)
 
@@ -119,6 +117,7 @@ def scan(image_true: np.ndarray, trained_model: torch.nn.Module, image_size: int
     )
 
     r_H, r_W = out.shape
+    # thêm đệm trắng quanh mask --> khi tìm canny + contour không bị cụt sát viền
     _out_extended = np.zeros((IMAGE_SIZE + r_H, IMAGE_SIZE + r_W), dtype=out.dtype)
     _out_extended[half : half + IMAGE_SIZE, half : half + IMAGE_SIZE] = out * 255
     out = _out_extended.copy()
@@ -161,6 +160,7 @@ def scan(image_true: np.ndarray, trained_model: torch.nn.Module, image_size: int
         image_true = image_extended.astype(np.float32)
         corners = box + np.array([left_pad, top_pad])
 
+    # làm ảnh phẳng, thẳng góc, kích thước đúng tỷ lệ giấy
     corners = order_points(sorted(corners.tolist()))
     destination_corners = find_dest(corners)
 
@@ -169,7 +169,7 @@ def scan(image_true: np.ndarray, trained_model: torch.nn.Module, image_size: int
         image_true,
         M,
         (destination_corners[2][0], destination_corners[2][1]),
-        flags=cv2.INTER_LANCZOS4,
+        flags=cv2.INTER_LANCZOS4, # INTER_LANCZOS4 nội suy cao cấp, giữ nét tốt cho OCR
     )
 
     return np.clip(final, 0, 255).astype(np.uint8)
